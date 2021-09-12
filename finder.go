@@ -10,8 +10,9 @@ type Finder interface {
 	// Get the list of projects supported by this finder
 	Projects() []string
 
-	// Get the list of collectors support by the given project
-	Collectors(project string) []string
+	// Get the list of collectors supported by the given
+	// project. All projects if unset.
+	Collectors(project string) []Collector
 
 	// Find all the BGP data URLs that match the given query
 	Find(query Query) []Result
@@ -22,11 +23,8 @@ type Result struct {
 	// URL of the file
 	URL url.URL
 
-	// Name of the project that collected this file
-	Project string
-
-	// Name of the collector that collected this file
-	Collector string
+	// Collector that collected this file
+	Collector Collector
 
 	// TODO: other things?
 }

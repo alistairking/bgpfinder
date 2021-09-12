@@ -7,11 +7,8 @@ import (
 // TODO: think about how this should work -- just keep it simple! no
 // complex query structures
 type Query struct {
-	// Name of the project. All projects if unset
-	Project string
-
-	// Name of the collector. All collectors if unset
-	Collector string
+	// Collectors to search for. All collectors if unset/empty
+	Collector []Collector
 
 	// Query window start time (inclusive)
 	From time.Time
