@@ -1,7 +1,6 @@
 package bgpfinder
 
 import (
-	"net/url"
 	"time"
 )
 
@@ -43,7 +42,7 @@ type Query struct {
 // Represents a single BGP file found by a Finder.
 type Result struct {
 	// URL of the file
-	URL url.URL
+	URL string
 
 	// Collector that collected this file
 	Collector Collector
