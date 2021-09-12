@@ -16,8 +16,11 @@ type ProjectCmd struct {
 	// TODO
 }
 
-func (p *ProjectCmd) Run() error {
-	projs := bgpfinder.Projects()
+func (p *ProjectCmd) Run(log bgpfinder.Logger) error {
+	projs, err := bgpfinder.Projects()
+	if err != nil {
+		return fmt.Errorf("Failed to get project list: %v", err)
+	}
 	for _, proj := range projs {
 		fmt.Println(proj)
 	}
@@ -66,7 +69,7 @@ func main() {
 
 	// calls the appropriate command "Run" method
 	// TODO: pass some state here (logging?)
-	err = k.Run()
+	err = k.Run(*logp)
 	k.FatalIfErrorf(err)
 
 	// Wait a moment for the logger to drain any remaining messages

@@ -11,28 +11,37 @@ type MultiFinder struct {
 	mu      *sync.RWMutex
 }
 
-func NewMultiFinder(finders ...Finder) *MultiFinder {
+func NewMultiFinder(finders ...Finder) (*MultiFinder, error) {
 	m := &MultiFinder{
 		finders: map[string]Finder{},
 		mu:      &sync.RWMutex{},
 	}
 	for _, f := range finders {
-		m.AddFinder(f)
+		err := m.AddFinder(f)
+		if err != nil {
+			return nil, err
+		}
 	}
-	return m
+	return m, nil
 }
 
-func (m *MultiFinder) AddFinder(f Finder) {
+func (m *MultiFinder) AddFinder(f Finder) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	// TODO: handle project collisions
-	for _, proj := range f.Projects() {
+	projs, err := f.Projects()
+	if err != nil {
+		return err
+	}
+	for _, proj := range projs {
 		m.finders[proj] = f
 	}
+	return nil
 
 }
 
-func (m *MultiFinder) Projects() []string {
+func (m *MultiFinder) Projects() ([]string, error) {
+	// TODO: move this to AddFinder and cache result
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	projs := make([]string, len(m.finders))
@@ -41,15 +50,15 @@ func (m *MultiFinder) Projects() []string {
 		projs[idx] = p
 		idx++
 	}
-	return projs
+	return projs, nil
 }
 
-func (m *MultiFinder) Collectors(project string) []Collector {
+func (m *MultiFinder) Collectors(project string) ([]Collector, error) {
 	// TODO
-	return nil
+	return nil, nil
 }
 
-func (m *MultiFinder) Find(query Query) ([]Result, error) {
+func (m *MultiFinder) Find(query Query) ([]File, error) {
 	// TODO
 	return nil, nil
 }

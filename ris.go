@@ -12,27 +12,23 @@ type RISFinder struct {
 
 func NewRISFinder() *RISFinder {
 	f := &RISFinder{}
-
-	// TODO: turn this into a goroutine that periodically
-	// refreshes collector list (and handles transient failures)?
-	c, _ := f.getCollectors()
-	f.collectors = c
-
 	return f
 }
 
-func (f *RISFinder) Projects() []string {
-	return []string{RIS}
+func (f *RISFinder) Projects() ([]string, error) {
+	return []string{RIS}, nil
 }
 
-func (f *RISFinder) Collectors(project string) []Collector {
+func (f *RISFinder) Collectors(project string) ([]Collector, error) {
 	if project != RIS {
-		return nil
+		return nil, nil
 	}
-	return f.collectors
+	// TODO: turn this into a goroutine that periodically
+	// refreshes collector list (and handles transient failures)?
+	return f.getCollectors()
 }
 
-func (f *RISFinder) Find(query Query) ([]Result, error) {
+func (f *RISFinder) Find(query Query) ([]File, error) {
 	// TODO
 	return nil, nil
 }

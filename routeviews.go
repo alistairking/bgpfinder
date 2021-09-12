@@ -13,26 +13,23 @@ type RouteViewsFinder struct {
 func NewRouteViewsFinder() *RouteViewsFinder {
 	f := &RouteViewsFinder{}
 
-	// TODO: turn this into a goroutine that periodically
-	// refreshes collector list (and handles transient failures)?
-	c, _ := f.getCollectors()
-	f.collectors = c
-
 	return f
 }
 
-func (f *RouteViewsFinder) Projects() []string {
-	return []string{ROUTEVIEWS}
+func (f *RouteViewsFinder) Projects() ([]string, error) {
+	return []string{ROUTEVIEWS}, nil
 }
 
-func (f *RouteViewsFinder) Collectors(project string) []Collector {
+func (f *RouteViewsFinder) Collectors(project string) ([]Collector, error) {
 	if project != ROUTEVIEWS {
-		return nil
+		return nil, nil
 	}
-	return f.collectors
+	// TODO: turn this into a goroutine that periodically
+	// refreshes collector list (and handles transient failures)?
+	return f.getCollectors()
 }
 
-func (f *RouteViewsFinder) Find(query Query) ([]Result, error) {
+func (f *RouteViewsFinder) Find(query Query) ([]File, error) {
 	// TODO
 	return nil, nil
 }
