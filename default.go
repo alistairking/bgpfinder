@@ -5,13 +5,10 @@ package bgpfinder
 //
 // If you have a custom (private) finder, you can either register it
 // with this finder instance, or use it directly.
-var DefaultFinder = initDefaultFinder()
-
-func initDefaultFinder() *MultiFinder {
-	m := NewMultiFinder()
-	// TODO: add each of our default finder providers (RV, RIS)
-	return m
-}
+var DefaultFinder = NewMultiFinder(
+	NewRouteViewsFinder(),
+	NewRISFinder(),
+)
 
 func Projects() []string {
 	return DefaultFinder.Projects()
@@ -21,6 +18,6 @@ func Collectors(project string) []Collector {
 	return DefaultFinder.Collectors(project)
 }
 
-func Find(query Query) []Result {
+func Find(query Query) ([]Result, error) {
 	return DefaultFinder.Find(query)
 }

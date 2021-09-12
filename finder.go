@@ -2,6 +2,7 @@ package bgpfinder
 
 import (
 	"net/url"
+	"time"
 )
 
 // Just a sketch of what the base Finder interface might look like.
@@ -15,7 +16,28 @@ type Finder interface {
 	Collectors(project string) []Collector
 
 	// Find all the BGP data URLs that match the given query
-	Find(query Query) []Result
+	Find(query Query) ([]Result, error)
+}
+
+type Collector struct {
+	// Project name the collector belongs to
+	Project string
+
+	// Name of the collector
+	Name string
+}
+
+// TODO: think about how this should work -- just keep it simple! no
+// complex query structures
+type Query struct {
+	// Collectors to search for. All collectors if unset/empty
+	Collector []Collector
+
+	// Query window start time (inclusive)
+	From time.Time
+
+	// Query window end time (exclusive)
+	Until time.Time
 }
 
 // Represents a single BGP file found by a Finder.
@@ -26,5 +48,8 @@ type Result struct {
 	// Collector that collected this file
 	Collector Collector
 
-	// TODO: other things?
+	// Nominal dump duration
+	Duration time.Duration
+
+	// TODO: other things? (file size?)
 }
