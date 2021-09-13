@@ -26,7 +26,15 @@ func (f *RouteViewsFinder) Collectors(project string) ([]Collector, error) {
 	}
 	// TODO: turn this into a goroutine that periodically
 	// refreshes collector list (and handles transient failures)?
-	return f.getCollectors()
+	if f.collectors != nil {
+		return f.collectors, nil
+	}
+	c, err := f.getCollectors()
+	if err != nil {
+		return nil, err
+	}
+	f.collectors = c
+	return c, nil
 }
 
 func (f *RouteViewsFinder) Find(query Query) ([]File, error) {
@@ -35,5 +43,17 @@ func (f *RouteViewsFinder) Find(query Query) ([]File, error) {
 }
 
 func (f *RouteViewsFinder) getCollectors() ([]Collector, error) {
+	// If we can find a Go rsync client (not a wrapper) we could
+	// just do `rsync archive.routeviews.org::` and do some light
+	// parsing on the output.
+	//
+	// Alternatively we can parse http://archive.routeviews.org/
+	// and look for links like
+	// http://archive.routeviews.org/route-views.chicago/bgpdata
+	//
+	// I'd like to not repeat the original mistake we made and
+	// would prefer to call the above collector "chicago" rather
+	// than "route-views.chicago". We can always map these back if
+	// we need to for BGPStream compat.
 	return nil, nil
 }
