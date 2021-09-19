@@ -86,7 +86,7 @@ func (f *RouteViewsFinder) Find(query Query) ([]File, error) {
 }
 
 func (f *RouteViewsFinder) getCollectors() ([]Collector, error) {
-	// If we can find a Go rsync client (not a wrapper) we could just do
+	// If we could find a Go rsync client (not a wrapper) we could just do
 	// `rsync archive.routeviews.org::` and do some light parsing on the
 	// output.
 	//
