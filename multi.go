@@ -116,8 +116,16 @@ func (m *MultiFinder) Collector(name string) (Collector, error) {
 }
 
 func (m *MultiFinder) Find(query Query) ([]File, error) {
-	// TODO
-	return nil, nil
+	// TODO: only send the query to the appropriate finders
+	files := []File{}
+	for proj, f := range m.getFinders() {
+		pF, err := f.Find(query)
+		if err != nil {
+			return nil, fmt.Errorf("find failed for %s: %v", proj, err)
+		}
+		files = append(files, pF...)
+	}
+	return files, nil
 }
 
 func (m *MultiFinder) getFinderByProject(projName string) (Finder, bool) {
@@ -125,4 +133,15 @@ func (m *MultiFinder) getFinderByProject(projName string) (Finder, bool) {
 	defer m.mu.RUnlock()
 	f, exists := m.finders[projName]
 	return f, exists
+}
+
+func (m *MultiFinder) getFinders() map[string]Finder {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	// TODO: wrote this in a rush. FIXME
+	fCopy := map[string]Finder{}
+	for p, f := range m.finders {
+		fCopy[p] = f
+	}
+	return fCopy
 }

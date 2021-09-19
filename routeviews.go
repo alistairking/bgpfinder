@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/alistairking/bgpfinder/scraper"
 )
@@ -33,6 +34,7 @@ var (
 // TODO: refactor a this common caching-finder code out so that RIS and PCH can use it
 type RouteViewsFinder struct {
 	// Cache of collectors
+	mu            *sync.RWMutex
 	collectors    []Collector
 	collectorsErr error // set if collectors is nil, nil otherwise
 }
@@ -64,6 +66,8 @@ func (f *RouteViewsFinder) Collectors(project string) ([]Collector, error) {
 	if project != "" && project != ROUTEVIEWS {
 		return nil, nil
 	}
+	f.mu.RLock()
+	defer f.mu.RUnlock()
 	return f.collectors, f.collectorsErr
 }
 
@@ -71,6 +75,8 @@ func (f *RouteViewsFinder) Collector(name string) (Collector, error) {
 	if f.collectorsErr != nil {
 		return Collector{}, f.collectorsErr
 	}
+	f.mu.RLock()
+	defer f.mu.RUnlock()
 	// TODO: add a map to avoid the linear search
 	for _, c := range f.collectors {
 		if c.Name == name {
@@ -81,8 +87,28 @@ func (f *RouteViewsFinder) Collector(name string) (Collector, error) {
 }
 
 func (f *RouteViewsFinder) Find(query Query) ([]File, error) {
-	// TODO
-	return nil, nil
+	// ok, let's figure out which collectors we should query
+	if len(query.Collectors) == 0 {
+		// give them everything we got
+		c, err := f.Collectors("")
+		if err != nil {
+			return nil, err
+		}
+		query.Collectors = c
+	}
+	results := []File{}
+	// RV archives data by collector, so we want to do a collector-first
+	// search
+	for _, coll := range query.Collectors {
+		cRes, err := f.findFiles(coll, query)
+		if err != nil {
+			// TODO: probably don't need to give up the whole
+			// search...
+			return nil, err
+		}
+		results = append(results, cRes...)
+	}
+	return results, nil
 }
 
 func (f *RouteViewsFinder) getCollectors() ([]Collector, error) {
@@ -153,4 +179,12 @@ func (f *RouteViewsFinder) getCollectors() ([]Collector, error) {
 		})
 	}
 	return colls, nil
+}
+
+func (f *RouteViewsFinder) findFiles(coll Collector, query Query) ([]File, error) {
+	// RV archive is organized by YYYY.MM, so let's build a list of the
+	// months we need to visit
+	return []File{
+		{URL: "foobar123"},
+	}, nil
 }

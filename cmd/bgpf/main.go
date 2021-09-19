@@ -10,9 +10,10 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/alistairking/bgpfinder"
+	"github.com/araddon/dateparse"
 )
 
-// TODO: think about how these projects/collectors queries should work.
+// TODO: think about how these projects/collectors/files queries should work.
 //
 // Other than for interactive exploration, I guess people will want to be able
 // to use the output from these commands to drive shell scripts. E.g., list all
@@ -55,10 +56,63 @@ func (p *CollectorsCmd) Run(log bgpfinder.Logger, cli BgpfCLI) error {
 	return nil
 }
 
+type FilesCmd struct {
+	// TODO: we can support multiple projects. This whole CLI
+	// needs some thought and love about how to make it usable.
+	Project    string   `help:"Find files for the given project" required`
+	Collectors []string `help:"Find files for the given collector" required`
+	From       string   `help:"Minimum time to search for (inclusive)" required`
+	Until      string   `help:"Maximum time to search for (exclusive)" required`
+}
+
+func (c *FilesCmd) Run(log bgpfinder.Logger, cli BgpfCLI) error {
+	// TODO: LOTS OF REFACTORING
+	// flexi-parse the from/until times
+	fromTime, err := dateparse.ParseAny(c.From)
+	if err != nil {
+		return fmt.Errorf("failed to parse 'from' time: %v", err)
+	}
+	untilTime, err := dateparse.ParseAny(c.Until)
+	if err != nil {
+		return fmt.Errorf("failed to parse 'until' time: %v", err)
+	}
+
+	query := bgpfinder.Query{
+		Collectors: []bgpfinder.Collector{
+			{Project: bgpfinder.Project{Name: c.Project}},
+		},
+		From:     fromTime,
+		Until:    untilTime,
+		DumpType: bgpfinder.DUMP_TYPE_ANY, // TODO
+	}
+
+	files, err := bgpfinder.Find(query)
+	if err != nil {
+		qJs, err := json.Marshal(query)
+		qStr := string(qJs)
+		if err != nil {
+			qStr = err.Error()
+		}
+		return fmt.Errorf("failed to find files for query: %s", qStr)
+	}
+	for _, f := range files {
+		switch cli.Format {
+		case "json":
+			l, _ := json.Marshal(f)
+			fmt.Println(string(l))
+		case "csv":
+			// TODO
+			//fmt.Println(f.AsCSV())
+		}
+	}
+	return nil
+}
+
 type BgpfCLI struct {
 	// sub commands
 	Projects   ProjectsCmd   `cmd help:"Get information about supported projects"`
 	Collectors CollectorsCmd `cmd help:"Get information about supported collectors"`
+	Files      FilesCmd      `cmd help:"Find BGP dump files"`
 
 	// global options
 	Format string `help"Output format" default:"json" enum:"json,csv"`

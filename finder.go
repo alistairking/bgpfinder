@@ -62,20 +62,31 @@ func (c Collector) AsCSV() string {
 	}, ",")
 }
 
-// TODO: add BGPStream backwards compat names. This may neccesitate
-// turning Project into a special type
+// TODO: add BGPStream backwards compat names.
+
+//go:generate enumer -type=DumpType -json -text -linecomment
+type DumpType uint8
+
+const (
+	DUMP_TYPE_ANY     DumpType = 0 // any
+	DUMP_TYPE_RIB     DumpType = 1 // rib
+	DUMP_TYPE_UPDATES DumpType = 2 // updates
+)
 
 // TODO: think about how this should work -- just keep it simple! no
 // complex query structures
 type Query struct {
 	// Collectors to search for. All collectors if unset/empty
-	Collector []Collector
+	Collectors []Collector
 
 	// Query window start time (inclusive)
 	From time.Time
 
 	// Query window end time (exclusive)
 	Until time.Time
+
+	// Dump type to search for. Any type if unset
+	DumpType DumpType
 }
 
 // Represents a single BGP file found by a Finder.
@@ -89,6 +100,9 @@ type File struct {
 
 	// Nominal dump duration
 	Duration time.Duration
+
+	// Dump type
+	DumpType DumpType
 
 	// TODO: other things? (file size?)
 }
