@@ -2,11 +2,11 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/alecthomas/kong"
 	"github.com/alistairking/bgpfinder"
@@ -23,10 +23,10 @@ type ProjectsCmd struct {
 	// TODO
 }
 
-func (p *ProjectsCmd) Run(log bgpfinder.Logger) error {
+func (p *ProjectsCmd) Run(log bgpfinder.Logger, cli BgpfCLI) error {
 	projs, err := bgpfinder.Projects()
 	if err != nil {
-		return fmt.Errorf("Failed to get project list: %v", err)
+		return fmt.Errorf("failed to get project list: %v", err)
 	}
 	for _, proj := range projs {
 		fmt.Println(proj)
@@ -38,13 +38,19 @@ type CollectorsCmd struct {
 	Project string `help:"Show collectors for the given project"`
 }
 
-func (p *CollectorsCmd) Run(log bgpfinder.Logger) error {
+func (p *CollectorsCmd) Run(log bgpfinder.Logger, cli BgpfCLI) error {
 	colls, err := bgpfinder.Collectors(p.Project)
 	if err != nil {
-		return fmt.Errorf("Failed to get collector list: %v", err)
+		return fmt.Errorf("failed to get collector list: %v", err)
 	}
 	for _, coll := range colls {
-		fmt.Println(coll.String())
+		switch cli.Format {
+		case "json":
+			l, _ := json.Marshal(coll)
+			fmt.Println(string(l))
+		case "csv":
+			fmt.Println(coll.AsCSV())
+		}
 	}
 	return nil
 }
@@ -54,7 +60,8 @@ type BgpfCLI struct {
 	Projects   ProjectsCmd   `cmd help:"Get information about supported projects"`
 	Collectors CollectorsCmd `cmd help:"Get information about supported collectors"`
 
-	// TODO
+	// global options
+	Format string `help"Output format" default:"json" enum:"json,csv"`
 
 	// logging configuration
 	bgpfinder.LoggerConfig
@@ -88,13 +95,10 @@ func main() {
 	defer cancel()
 	logp, err := bgpfinder.NewLogger(cliCfg.LoggerConfig)
 	k.FatalIfErrorf(err)
+	defer os.Stderr.Sync() // flush remaining logs
 	handleSignals(ctx, *logp, cancel)
 
 	// calls the appropriate command "Run" method
-	// TODO: pass some state here (logging?)
-	err = k.Run(*logp)
+	err = k.Run(*logp, cliCfg)
 	k.FatalIfErrorf(err)
-
-	// Wait a moment for the logger to drain any remaining messages
-	time.Sleep(time.Second)
 }

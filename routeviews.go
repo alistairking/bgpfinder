@@ -2,6 +2,7 @@ package bgpfinder
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/alistairking/bgpfinder/scraper"
@@ -14,13 +15,16 @@ const (
 )
 
 var (
-	ROUTEVIEWS_COLLECTOR_OVERRIDES = map[string]string{
-		"":           "rv2",
-		"3":          "rv3",
-		"4":          "rv4",
-		"6":          "rv6",
-		"2.saopaulo": "saopaulo2",
+	// These are last-resort overrides to "fix" an out-of-pattern RV
+	// collector name.
+	ROUTEVIEWS_COLLECTOR_OVERRIDES = map[string][2]string{
+		"": {"route-views2", "rv2"},
 	}
+
+	// Various collector-name parsing regexes
+	// XXX: could collapse these into a single regex perhaps
+	rvCollDigitsOnly = regexp.MustCompile(`^route-views(\d+)$`)
+	rvCollName       = regexp.MustCompile(`^route-views(\d+)?\.([a-zA-Z0-9]+)$`)
 )
 
 // TODO: Finder implementation for the RouteViews archive
@@ -76,7 +80,7 @@ func (f *RouteViewsFinder) getCollectors() ([]Collector, error) {
 	// BGPStream compat.
 	links, err := scraper.ScrapeLinks(ROUTEVIEWS_COLLECTORS_URL)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to get collector list: %v", err)
+		return nil, fmt.Errorf("failed to get collector list: %v", err)
 	}
 	// we're expecting to get things like:
 	// '/route-views.nwax/bgpdata'
@@ -86,21 +90,46 @@ func (f *RouteViewsFinder) getCollectors() ([]Collector, error) {
 	// 'telnet://route-views.perth.routeviews.org'
 	colls := []Collector{}
 	for _, link := range links {
-		// TODO: make this more generic
+		origLink := link
+		intName := ""
 		if !strings.HasSuffix(link, "/bgpdata") {
 			continue
 		}
-		link = strings.TrimPrefix(link, "/route-views")
 		link = strings.TrimSuffix(link, "/bgpdata")
-		link = strings.TrimPrefix(link, ".")
-		// TODO:...
+		link = strings.TrimPrefix(link, "/")
+		// now we're left with three classes of collector (and one oddball)
+		// '<DIGIT>' => 'rv<DIGIT>'
+		m := rvCollDigitsOnly.FindStringSubmatch(link)
+		if len(m) == 2 {
+			intName = link
+			link = "rv" + m[1]
+		}
+		m = rvCollName.FindStringSubmatch(link)
+		if m != nil {
+			intName = link
+			// route-views.sg
+			link = m[2]
+			if len(m) == 3 {
+				// route-views2.saopaulo
+				link += m[1]
+			}
+		}
+		// 'route-views.<NAME> => '<NAME>'
+		// 'route-views<DIGIT>.<NAME> => '<NAME><DIGIT>'
 		override, exists := ROUTEVIEWS_COLLECTOR_OVERRIDES[link]
 		if exists {
-			link = override
+			intName = override[0]
+			link = override[1]
+		}
+		if intName == "" {
+			return nil, fmt.Errorf("unexpected collector pattern: '%s' ('%s'). "+
+				"Please file a parser bug report at "+
+				"https://github.com/alistairking/bgpfinder/issues", link, origLink)
 		}
 		colls = append(colls, Collector{
-			Project: ROUTEVIEWS,
-			Name:    link,
+			Project:      ROUTEVIEWS,
+			Name:         link,
+			InternalName: intName,
 		})
 	}
 	return colls, nil

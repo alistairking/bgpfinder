@@ -61,7 +61,7 @@ func (m *MultiFinder) Collectors(project string) ([]Collector, error) {
 		proj, exists := m.finders[project]
 		if !exists {
 			// TODO: define our error types
-			return nil, fmt.Errorf("Unknown project: '%s'", project)
+			return nil, fmt.Errorf("unknown project: '%s'", project)
 		}
 		return proj.Collectors(project)
 	}

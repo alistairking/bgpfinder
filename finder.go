@@ -2,6 +2,7 @@ package bgpfinder
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -25,10 +26,21 @@ type Collector struct {
 
 	// Name of the collector
 	Name string `json:"name"`
+
+	// Project-internal name for this collector
+	InternalName string `json:"internal_name"`
 }
 
 func (c Collector) String() string {
 	return fmt.Sprintf("%s:%s", c.Project, c.Name)
+}
+
+func (c Collector) AsCSV() string {
+	return strings.Join([]string{
+		c.Project,
+		c.Name,
+		c.InternalName,
+	}, ",")
 }
 
 // TODO: add BGPStream backwards compat names. This may neccesitate
