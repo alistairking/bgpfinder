@@ -18,12 +18,20 @@ func mustInitDefaultFinder() Finder {
 	return f
 }
 
-func Projects() ([]string, error) {
+func Projects() ([]Project, error) {
 	return DefaultFinder.Projects()
+}
+
+func GetProject(name string) (Project, error) {
+	return DefaultFinder.Project(name)
 }
 
 func Collectors(project string) ([]Collector, error) {
 	return DefaultFinder.Collectors(project)
+}
+
+func GetCollector(name string) (Collector, error) {
+	return DefaultFinder.Collector(name)
 }
 
 func Find(query Query) ([]File, error) {

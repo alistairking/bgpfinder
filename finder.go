@@ -6,23 +6,42 @@ import (
 	"time"
 )
 
-// Just a sketch of what the base Finder interface might look like.
-// Everything gets built on top of (or under, I guess) this.
+// Just a sketch of what the base Finder interface might look like.  Everything
+// gets built on top of (or under, I guess) this.
 type Finder interface {
 	// Get the list of projects supported by this finder
-	Projects() ([]string, error)
+	Projects() ([]Project, error)
 
-	// Get the list of collectors supported by the given
-	// project. All projects if unset.
+	// Get a specific project
+	Project(name string) (Project, error)
+
+	// Get the list of collectors supported by the given project. All
+	// projects if unset.
 	Collectors(project string) ([]Collector, error)
+
+	// Get a specific collector by name, returns the zero collector if there
+	// is no such collector
+	Collector(name string) (Collector, error)
 
 	// Find all the BGP data URLs that match the given query
 	Find(query Query) ([]File, error)
 }
 
+type Project struct {
+	Name string `json:"name"`
+}
+
+func (p Project) String() string {
+	return p.Name
+}
+
+func (p Project) AsCSV() string {
+	return p.Name
+}
+
 type Collector struct {
 	// Project name the collector belongs to
-	Project string `json:"project"`
+	Project Project `json:"project"`
 
 	// Name of the collector
 	Name string `json:"name"`
@@ -37,7 +56,7 @@ func (c Collector) String() string {
 
 func (c Collector) AsCSV() string {
 	return strings.Join([]string{
-		c.Project,
+		c.Project.AsCSV(),
 		c.Name,
 		c.InternalName,
 	}, ",")

@@ -15,6 +15,8 @@ const (
 )
 
 var (
+	ROUTEVIEWS_PROJECT = Project{Name: ROUTEVIEWS}
+
 	// These are last-resort overrides to "fix" an out-of-pattern RV
 	// collector name.
 	ROUTEVIEWS_COLLECTOR_OVERRIDES = map[string][2]string{
@@ -28,36 +30,54 @@ var (
 )
 
 // TODO: Finder implementation for the RouteViews archive
+// TODO: refactor a this common caching-finder code out so that RIS and PCH can use it
 type RouteViewsFinder struct {
 	// Cache of collectors
-	collectors []Collector
+	collectors    []Collector
+	collectorsErr error // set if collectors is nil, nil otherwise
 }
 
 func NewRouteViewsFinder() *RouteViewsFinder {
 	f := &RouteViewsFinder{}
 
+	// TODO: turn this into a goroutine that periodically
+	// refreshes collector list (and handles transient failures)?
+	c, err := f.getCollectors()
+	f.collectors = c
+	f.collectorsErr = err
+
 	return f
 }
 
-func (f *RouteViewsFinder) Projects() ([]string, error) {
-	return []string{ROUTEVIEWS}, nil
+func (f *RouteViewsFinder) Projects() ([]Project, error) {
+	return []Project{ROUTEVIEWS_PROJECT}, nil
+}
+
+func (f *RouteViewsFinder) Project(name string) (Project, error) {
+	if name == "" || name == ROUTEVIEWS {
+		return ROUTEVIEWS_PROJECT, nil
+	}
+	return Project{}, nil
 }
 
 func (f *RouteViewsFinder) Collectors(project string) ([]Collector, error) {
 	if project != "" && project != ROUTEVIEWS {
 		return nil, nil
 	}
-	// TODO: turn this into a goroutine that periodically
-	// refreshes collector list (and handles transient failures)?
-	if f.collectors != nil {
-		return f.collectors, nil
+	return f.collectors, f.collectorsErr
+}
+
+func (f *RouteViewsFinder) Collector(name string) (Collector, error) {
+	if f.collectorsErr != nil {
+		return Collector{}, f.collectorsErr
 	}
-	c, err := f.getCollectors()
-	if err != nil {
-		return nil, err
+	// TODO: add a map to avoid the linear search
+	for _, c := range f.collectors {
+		if c.Name == name {
+			return c, nil
+		}
 	}
-	f.collectors = c
-	return c, nil
+	return Collector{}, nil
 }
 
 func (f *RouteViewsFinder) Find(query Query) ([]File, error) {
@@ -127,7 +147,7 @@ func (f *RouteViewsFinder) getCollectors() ([]Collector, error) {
 				"https://github.com/alistairking/bgpfinder/issues", link, origLink)
 		}
 		colls = append(colls, Collector{
-			Project:      ROUTEVIEWS,
+			Project:      ROUTEVIEWS_PROJECT,
 			Name:         link,
 			InternalName: intName,
 		})
