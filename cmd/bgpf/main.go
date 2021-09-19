@@ -12,11 +12,18 @@ import (
 	"github.com/alistairking/bgpfinder"
 )
 
-type ProjectCmd struct {
+// TODO: think about how these projects/collectors queries should work.
+//
+// Other than for interactive exploration, I guess people will want to be able
+// to use the output from these commands to drive shell scripts. E.g., list all
+// RV collectors and then do something for each one. Or, list all supported
+// collectors.
+
+type ProjectsCmd struct {
 	// TODO
 }
 
-func (p *ProjectCmd) Run(log bgpfinder.Logger) error {
+func (p *ProjectsCmd) Run(log bgpfinder.Logger) error {
 	projs, err := bgpfinder.Projects()
 	if err != nil {
 		return fmt.Errorf("Failed to get project list: %v", err)
@@ -27,9 +34,25 @@ func (p *ProjectCmd) Run(log bgpfinder.Logger) error {
 	return nil
 }
 
+type CollectorsCmd struct {
+	Project string `help:"Show collectors for the given project"`
+}
+
+func (p *CollectorsCmd) Run(log bgpfinder.Logger) error {
+	colls, err := bgpfinder.Collectors(p.Project)
+	if err != nil {
+		return fmt.Errorf("Failed to get collector list: %v", err)
+	}
+	for _, coll := range colls {
+		fmt.Println(coll.String())
+	}
+	return nil
+}
+
 type BgpfCLI struct {
 	// sub commands
-	Project ProjectCmd `cmd help:"Get information about supported projects"`
+	Projects   ProjectsCmd   `cmd help:"Get information about supported projects"`
+	Collectors CollectorsCmd `cmd help:"Get information about supported collectors"`
 
 	// TODO
 

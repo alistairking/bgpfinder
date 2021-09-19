@@ -1,11 +1,12 @@
 package bgpfinder
 
 import (
+	"fmt"
 	"sync"
 )
 
-// Finder implementation that handles routing requests to a set of sub
-// finder instances.
+// Finder implementation that handles routing requests to a set of sub finder
+// instances.
 type MultiFinder struct {
 	finders map[string]Finder
 	mu      *sync.RWMutex
@@ -54,8 +55,26 @@ func (m *MultiFinder) Projects() ([]string, error) {
 }
 
 func (m *MultiFinder) Collectors(project string) ([]Collector, error) {
-	// TODO
-	return nil, nil
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if project != "" {
+		proj, exists := m.finders[project]
+		if !exists {
+			// TODO: define our error types
+			return nil, fmt.Errorf("Unknown project: '%s'", project)
+		}
+		return proj.Collectors(project)
+	}
+	allColls := []Collector{}
+	for _, f := range m.finders {
+		colls, err := f.Collectors(project)
+		if err != nil {
+			return nil, err
+		}
+		allColls = append(allColls, colls...)
+
+	}
+	return allColls, nil
 }
 
 func (m *MultiFinder) Find(query Query) ([]File, error) {

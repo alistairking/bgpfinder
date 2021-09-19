@@ -1,6 +1,7 @@
 package bgpfinder
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -20,11 +21,18 @@ type Finder interface {
 
 type Collector struct {
 	// Project name the collector belongs to
-	Project string
+	Project string `json:"project"`
 
 	// Name of the collector
-	Name string
+	Name string `json:"name"`
 }
+
+func (c Collector) String() string {
+	return fmt.Sprintf("%s:%s", c.Project, c.Name)
+}
+
+// TODO: add BGPStream backwards compat names. This may neccesitate
+// turning Project into a special type
 
 // TODO: think about how this should work -- just keep it simple! no
 // complex query structures
