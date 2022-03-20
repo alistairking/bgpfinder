@@ -40,7 +40,9 @@ type RouteViewsFinder struct {
 }
 
 func NewRouteViewsFinder() *RouteViewsFinder {
-	f := &RouteViewsFinder{}
+	f := &RouteViewsFinder{
+		mu: &sync.RWMutex{},
+	}
 
 	// TODO: turn this into a goroutine that periodically
 	// refreshes collector list (and handles transient failures)?

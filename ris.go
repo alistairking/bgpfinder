@@ -3,6 +3,7 @@ package bgpfinder
 import (
 	"fmt"
 	"regexp"
+	"sync"
 
 	"github.com/alistairking/bgpfinder/scraper"
 )
@@ -25,12 +26,15 @@ var (
 
 type RISFinder struct {
 	// Cache of collectors
+	mu            *sync.RWMutex
 	collectors    []Collector
 	collectorsErr error // set if collectors is nil, nil otherwise
 }
 
 func NewRISFinder() *RISFinder {
-	f := &RISFinder{}
+	f := &RISFinder{
+		mu: &sync.RWMutex{},
+	}
 
 	// TODO: turn this into a goroutine that periodically
 	// refreshes collector list (and handles transient failures)?
@@ -56,6 +60,8 @@ func (f *RISFinder) Collectors(project string) ([]Collector, error) {
 	if project != "" && project != RIS {
 		return nil, nil
 	}
+	f.mu.RLock()
+	defer f.mu.RUnlock()
 	return f.collectors, f.collectorsErr
 }
 
@@ -63,6 +69,8 @@ func (f *RISFinder) Collector(name string) (Collector, error) {
 	if f.collectorsErr != nil {
 		return Collector{}, f.collectorsErr
 	}
+	f.mu.RLock()
+	defer f.mu.RUnlock()
 	// TODO: add a map to avoid the linear search
 	for _, c := range f.collectors {
 		if c.Name == name {

@@ -8,11 +8,15 @@ CLI=bgpf
 
 all: cli
 
-dev: mod-tidy codegen pkg cli test
+dev: mod-tidy codegen pkg cli-dev test
 
 cli:
 	mkdir -p $(BINDIR)
 	$(GOBUILD) -o $(BINDIR)/$(CLI) -v ./cmd/$(CLI)
+
+cli-dev:
+	mkdir -p $(BINDIR)
+	$(GOBUILD) -race -o $(BINDIR)/$(CLI) -v ./cmd/$(CLI)
 
 pkg:
 	$(GOBUILD) ./

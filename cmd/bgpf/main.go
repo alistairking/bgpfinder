@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/alecthomas/kong"
@@ -59,10 +60,11 @@ func (p *CollectorsCmd) Run(log bgpfinder.Logger, cli BgpfCLI) error {
 type FilesCmd struct {
 	// TODO: we can support multiple projects. This whole CLI
 	// needs some thought and love about how to make it usable.
-	Project    string   `help:"Find files for the given project" required`
-	Collectors []string `help:"Find files for the given collector" required`
-	From       string   `help:"Minimum time to search for (inclusive)" required`
-	Until      string   `help:"Maximum time to search for (exclusive)" required`
+	Project    string             `help:"Find files for the given project" required`
+	Collectors []string           `help:"Find files for the given collector" required`
+	From       string             `help:"Minimum time to search for (inclusive)" required`
+	Until      string             `help:"Maximum time to search for (exclusive)" required`
+	Type       bgpfinder.DumpType `help:"Dump type to find (${enum})" default:"${dump_type_def}" enum:"${dump_type_opts}"`
 }
 
 func (c *FilesCmd) Run(log bgpfinder.Logger, cli BgpfCLI) error {
@@ -83,7 +85,7 @@ func (c *FilesCmd) Run(log bgpfinder.Logger, cli BgpfCLI) error {
 		},
 		From:     fromTime,
 		Until:    untilTime,
-		DumpType: bgpfinder.DUMP_TYPE_ANY, // TODO
+		DumpType: c.Type,
 	}
 
 	files, err := bgpfinder.Find(query)
@@ -138,10 +140,23 @@ func handleSignals(ctx context.Context, log bgpfinder.Logger, cancel context.Can
 	}()
 }
 
+func dumpOptsStr() string {
+	opts := []string{}
+	for _, t := range bgpfinder.DumpTypeValues() {
+		opts = append(opts, t.String())
+	}
+	return strings.Join(opts, ",")
+}
+
 func main() {
 	// Parse command line args
 	var cliCfg BgpfCLI
-	k := kong.Parse(&cliCfg)
+	k := kong.Parse(&cliCfg,
+		kong.Vars{
+			"dump_type_def":  bgpfinder.DUMP_TYPE_ANY.String(),
+			"dump_type_opts": dumpOptsStr(),
+		},
+	)
 	k.Validate()
 
 	// Set up context, logger, and signal handling
