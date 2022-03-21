@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/alistairking/bgpfinder/scraper"
 )
@@ -22,6 +23,11 @@ var (
 	// collector name.
 	ROUTEVIEWS_COLLECTOR_OVERRIDES = map[string][2]string{
 		"": {"route-views2", "rv2"},
+	}
+
+	ROUTEVIEWS_DUMP_TYPES = map[DumpType]string{
+		DUMP_TYPE_RIB:     "RIBS",
+		DUMP_TYPE_UPDATES: "UPDATES",
 	}
 
 	// Various collector-name parsing regexes
@@ -85,6 +91,7 @@ func (f *RouteViewsFinder) Collector(name string) (Collector, error) {
 			return c, nil
 		}
 	}
+	// not found
 	return Collector{}, nil
 }
 
@@ -102,13 +109,25 @@ func (f *RouteViewsFinder) Find(query Query) ([]File, error) {
 	// RV archives data by collector, so we want to do a collector-first
 	// search
 	for _, coll := range query.Collectors {
-		cRes, err := f.findFiles(coll, query)
+		// we can't trust anything other than the collector
+		// name, so let's fix that
+		fColl, err := f.Collector(coll.Name)
+		if err != nil {
+			return nil, err
+		}
+		if fColl == ZeroCollector {
+			// invalid collector in query
+			return nil, fmt.Errorf("Invalid collector: %+v", coll)
+		}
+		cRes, err := f.findFiles(fColl, query)
 		if err != nil {
 			// TODO: probably don't need to give up the whole
 			// search...
 			return nil, err
 		}
-		results = append(results, cRes...)
+		if cRes != nil {
+			results = append(results, cRes...)
+		}
 	}
 	return results, nil
 }
@@ -183,10 +202,70 @@ func (f *RouteViewsFinder) getCollectors() ([]Collector, error) {
 	return colls, nil
 }
 
+func (f *RouteViewsFinder) collURL(coll Collector) string {
+	// RV2 is the only special-case URL (afaik)
+	if coll.Name == "rv2" {
+		return ROUTEVIEWS_ARCHIVE_URL + "bgpdata/"
+	}
+	return ROUTEVIEWS_ARCHIVE_URL + coll.InternalName + "/bgpdata/"
+}
+
+func (f *RouteViewsFinder) monthURL(coll Collector, month time.Time) string {
+	return f.collURL(coll) + month.Format("2006.01") + "/"
+}
+
+func (f *RouteViewsFinder) dumpTypeURL(coll Collector, month time.Time, rvdt string) string {
+	return f.monthURL(coll, month) + rvdt + "/"
+}
+
+func (f *RouteViewsFinder) dumpTypes(dt DumpType) ([]string, error) {
+	if dt == DUMP_TYPE_ANY {
+		all := []string{}
+		for _, rvdt := range ROUTEVIEWS_DUMP_TYPES {
+			all = append(all, rvdt)
+		}
+		return all, nil
+	}
+	rvt, ok := ROUTEVIEWS_DUMP_TYPES[dt]
+	if !ok {
+		return nil, fmt.Errorf("invalid RouteViews dump type: %v", dt)
+	}
+	return []string{rvt}, nil
+}
+
 func (f *RouteViewsFinder) findFiles(coll Collector, query Query) ([]File, error) {
-	// RV archive is organized by YYYY.MM, so let's build a list of the
-	// months we need to visit
-	return []File{
-		{URL: "foobar123"},
-	}, nil
+	// RV archive is organized by YYYY.MM, so we first iterate
+	// over the months in our query range (there has to be at
+	// least one)
+	//
+	// But first, let's figure out our dump type(s)
+	rvdts, err := f.dumpTypes(query.DumpType)
+	if err != nil {
+		return nil, err
+	}
+
+	res := []File{}
+	cur := query.From
+	for cur.Before(query.Until) {
+		for _, rvdt := range rvdts {
+			dtUrl := f.dumpTypeURL(coll, cur, rvdt)
+			if dtRes, err := f.findFilesForURL(res, dtUrl, query); err != nil {
+				return nil, err
+			} else {
+				res = dtRes
+			}
+
+		}
+		cur = cur.AddDate(0, 1, 0)
+	}
+	return nil, nil
+}
+
+func (f *RouteViewsFinder) findFilesForURL(res []File, url string, query Query) ([]File, error) {
+	// Here we have something like:
+	// url=http://archive.routeviews.org/route-views3/bgpdata/2020.09/RIBS/
+	// now we need to grab the files there and figure out which
+	// ones actually match our query.
+
+	return res, nil
 }

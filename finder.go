@@ -50,6 +50,8 @@ type Collector struct {
 	InternalName string `json:"internal_name"`
 }
 
+var ZeroCollector = Collector{}
+
 func (c Collector) String() string {
 	return fmt.Sprintf("%s:%s", c.Project, c.Name)
 }
@@ -75,6 +77,8 @@ const (
 
 // TODO: think about how this should work -- just keep it simple! no
 // complex query structures
+//
+// TODO: add Validate method (e.g., From is before Until, IsADumpType, etc.)
 type Query struct {
 	// Collectors to search for. All collectors if unset/empty
 	Collectors []Collector

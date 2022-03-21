@@ -79,23 +79,33 @@ func (c *FilesCmd) Run(log bgpfinder.Logger, cli BgpfCLI) error {
 		return fmt.Errorf("failed to parse 'until' time: %v", err)
 	}
 
+	proj := bgpfinder.Project{Name: c.Project}
+	colls := []bgpfinder.Collector{}
+	for _, c := range c.Collectors {
+		colls = append(colls,
+			bgpfinder.Collector{
+				Project: proj,
+				Name:    c,
+				// no internal name
+			},
+		)
+	}
+
 	query := bgpfinder.Query{
-		Collectors: []bgpfinder.Collector{
-			{Project: bgpfinder.Project{Name: c.Project}},
-		},
-		From:     fromTime,
-		Until:    untilTime,
-		DumpType: c.Type,
+		Collectors: colls,
+		From:       fromTime,
+		Until:      untilTime,
+		DumpType:   c.Type,
 	}
 
 	files, err := bgpfinder.Find(query)
 	if err != nil {
-		qJs, err := json.Marshal(query)
+		qJs, jErr := json.Marshal(query)
 		qStr := string(qJs)
-		if err != nil {
-			qStr = err.Error()
+		if jErr != nil {
+			qStr = jErr.Error()
 		}
-		return fmt.Errorf("failed to find files for query: %s", qStr)
+		return fmt.Errorf("failed to find files: %v. query: %s", err.Error(), qStr)
 	}
 	for _, f := range files {
 		switch cli.Format {
