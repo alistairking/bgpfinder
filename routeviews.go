@@ -25,16 +25,35 @@ var (
 		"": {"route-views2", "rv2"},
 	}
 
-	ROUTEVIEWS_DUMP_TYPES = map[DumpType]string{
-		DUMP_TYPE_RIB:     "RIBS",
-		DUMP_TYPE_UPDATES: "UPDATES",
+	ROUTEVIEWS_DUMP_TYPES = map[DumpType]rvDumpType{
+		DUMP_TYPE_RIB: {
+			DumpType: DUMP_TYPE_RIB,
+			Duration: time.Hour, // ish
+			URL:      "RIBS",
+			Regexp:   rvRIBFileRe,
+		},
+		DUMP_TYPE_UPDATES: {
+			DumpType: DUMP_TYPE_UPDATES,
+			Duration: time.Minute * 15,
+			URL:      "UPDATES",
+			Regexp:   rvUpdatesFileRe,
+		},
 	}
 
 	// Various collector-name parsing regexes
 	// XXX: could collapse these into a single regex perhaps
-	rvCollDigitsOnly = regexp.MustCompile(`^route-views(\d+)$`)
-	rvCollName       = regexp.MustCompile(`^route-views(\d+)?\.([a-zA-Z0-9]+)$`)
+	rvCollDigitsOnlyRe = regexp.MustCompile(`^route-views(\d+)$`)
+	rvCollNameRe       = regexp.MustCompile(`^route-views(\d+)?\.([a-zA-Z0-9]+)$`)
+	rvRIBFileRe        = regexp.MustCompile(`^rib\.(\d{8}\.\d{4})\.bz2$`)
+	rvUpdatesFileRe    = regexp.MustCompile(`^updates\.(\d{8}\.\d{4})\.bz2$`)
 )
+
+type rvDumpType struct {
+	DumpType DumpType
+	Duration time.Duration
+	URL      string
+	Regexp   *regexp.Regexp
+}
 
 // TODO: Finder implementation for the RouteViews archive
 // TODO: refactor a this common caching-finder code out so that RIS and PCH can use it
@@ -166,12 +185,12 @@ func (f *RouteViewsFinder) getCollectors() ([]Collector, error) {
 		link = strings.TrimPrefix(link, "/")
 		// now we're left with three classes of collector (and one oddball)
 		// '<DIGIT>' => 'rv<DIGIT>'
-		m := rvCollDigitsOnly.FindStringSubmatch(link)
+		m := rvCollDigitsOnlyRe.FindStringSubmatch(link)
 		if len(m) == 2 {
 			intName = link
 			link = "rv" + m[1]
 		}
-		m = rvCollName.FindStringSubmatch(link)
+		m = rvCollNameRe.FindStringSubmatch(link)
 		if m != nil {
 			intName = link
 			// route-views.sg
@@ -218,9 +237,9 @@ func (f *RouteViewsFinder) dumpTypeURL(coll Collector, month time.Time, rvdt str
 	return f.monthURL(coll, month) + rvdt + "/"
 }
 
-func (f *RouteViewsFinder) dumpTypes(dt DumpType) ([]string, error) {
+func (f *RouteViewsFinder) dumpTypes(dt DumpType) ([]rvDumpType, error) {
 	if dt == DUMP_TYPE_ANY {
-		all := []string{}
+		all := []rvDumpType{}
 		for _, rvdt := range ROUTEVIEWS_DUMP_TYPES {
 			all = append(all, rvdt)
 		}
@@ -230,7 +249,7 @@ func (f *RouteViewsFinder) dumpTypes(dt DumpType) ([]string, error) {
 	if !ok {
 		return nil, fmt.Errorf("invalid RouteViews dump type: %v", dt)
 	}
-	return []string{rvt}, nil
+	return []rvDumpType{rvt}, nil
 }
 
 func (f *RouteViewsFinder) findFiles(coll Collector, query Query) ([]File, error) {
@@ -248,31 +267,54 @@ func (f *RouteViewsFinder) findFiles(coll Collector, query Query) ([]File, error
 	cur := query.From
 	for cur.Before(query.Until) {
 		for _, rvdt := range rvdts {
-			dtUrl := f.dumpTypeURL(coll, cur, rvdt)
-			if dtRes, err := f.findFilesForURL(res, dtUrl, query); err != nil {
+			dtUrl := f.dumpTypeURL(coll, cur, rvdt.URL)
+			baseF := File{
+				URL:       dtUrl,
+				Collector: coll,
+				Duration:  rvdt.Duration,
+				DumpType:  rvdt.DumpType,
+			}
+			if dtRes, err := f.findFilesForURL(res, baseF, rvdt, query); err != nil {
 				return nil, err
 			} else {
 				res = dtRes
 			}
-
 		}
 		cur = cur.AddDate(0, 1, 0)
 	}
-	return nil, nil
+	return res, nil
 }
 
-func (f *RouteViewsFinder) findFilesForURL(res []File, url string, query Query) ([]File, error) {
+func (f *RouteViewsFinder) findFilesForURL(res []File, baseFile File, rvdt rvDumpType, query Query) ([]File, error) {
 	// Here we have something like:
 	// url=http://archive.routeviews.org/route-views3/bgpdata/2020.09/RIBS/
 	// now we need to grab the files there and figure out which
 	// ones actually match our query.
 
-	links, err := scraper.ScrapeLinks(url)
+	links, err := scraper.ScrapeLinks(baseFile.URL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get file list from %s: %v", url, err)
+		return nil, fmt.Errorf("failed to get file list from %s: %v",
+			baseFile.URL, err)
 	}
 
-	fmt.Println(url, len(links), links[50])
-
+	for _, fname := range links {
+		m := rvdt.Regexp.FindStringSubmatch(fname)
+		if m == nil {
+			continue
+		}
+		// TODO: validate m[0] (dump type)
+		// build a time from YYYYMMdd.HHMM
+		ft, err := time.Parse("20060102.1504", m[1])
+		if err != nil {
+			// TODO: we need a way to bubble up this kind of "error"
+			continue
+		}
+		if ft.Equal(query.From) ||
+			(ft.After(query.From) && ft.Before(query.Until)) {
+			f := baseFile
+			f.URL = f.URL + fname
+			res = append(res, f)
+		}
+	}
 	return res, nil
 }
