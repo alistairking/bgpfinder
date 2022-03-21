@@ -267,5 +267,12 @@ func (f *RouteViewsFinder) findFilesForURL(res []File, url string, query Query) 
 	// now we need to grab the files there and figure out which
 	// ones actually match our query.
 
+	links, err := scraper.ScrapeLinks(url)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get file list from %s: %v", url, err)
+	}
+
+	fmt.Println(url, len(links), links[50])
+
 	return res, nil
 }

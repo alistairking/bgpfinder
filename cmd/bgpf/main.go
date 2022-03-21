@@ -177,6 +177,10 @@ func main() {
 	defer os.Stderr.Sync() // flush remaining logs
 	handleSignals(ctx, *logp, cancel)
 
+	// TODO: update bgpfinder API to include Context in most/all
+	// calls since any of them might need to do blocking
+	// operations.
+
 	// calls the appropriate command "Run" method
 	err = k.Run(*logp, cliCfg)
 	k.FatalIfErrorf(err)
